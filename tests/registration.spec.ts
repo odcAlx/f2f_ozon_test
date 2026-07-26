@@ -1,92 +1,111 @@
 import { test, expect } from '@playwright/test';
-import { RegistrationPage } from '../pages/registrationPage';
+import { RegisterPage } from '../pages/registerPage';
 
-test.describe('Регистрация нового пользователя', () => {
-  
-  let registerPage: RegistrationPage;
+test.describe('Регистрация (T1–T4)', () => {
+
+  const password = 'Пароль';
+  const name = 'Саша';
+  const surname = 'Одинцов';
+
+  let registerPage: RegisterPage;
 
   test.beforeEach(async ({ page }) => {
 
-    registerPage = new RegistrationPage(page);
+    registerPage = new RegisterPage(page);
     await registerPage.navigate('/register');
 
   });
 
-  test.afterEach(async ({ page }) => {
+  test('T1. Успешная регистрация', async ({ page }) => {
 
-    // await page.goto('/logout');
-    console.log(1);
-
-  });
-
-  test.afterAll(async () => {
-
-    console.log(2);
+    const email = `test_${Date.now()}@mail.ru`;
+    await registerPage.register(name, surname, email, password);
+    await expect(page).toHaveURL(/.*login/);
 
   });
 
+  test('T2. Регистрация на уже существующий Email', async ({ page }) => {
 
-  test('Успешная регистрация', async ({ page }) => {
-    
-    const uniqueEmail = `test_${Date.now()}@mail.ru`;//дата для уникальности юзеров, чтобы тест не падал без обновления БД
-    
-    await registerPage.register('Саша', 'Одинцов', uniqueEmail, '1234');
-    await expect(page).toHaveURL('/login');
+    const occupiedEmail = `test_${Date.now()}@mail.ru`;
+    await registerPage.register('Первый', surname, occupiedEmail, password);
+    await expect(page).toHaveURL(/.*login/);
 
-  });
-
-});
-
-test.describe('Регистрация нового пользователя с невалидными данными', () => {
-
-  let registerPage: RegistrationPage;
-  
-  test.beforeEach(async ({ page }) => {
-
-    registerPage = new RegistrationPage(page);
     await registerPage.navigate('/register');
+    await registerPage.register('Второй', surname, occupiedEmail, password);
+    await expect(page).toHaveURL(/register/);
+    await expect(page.getByText('User with this email already exists')).toBeVisible();
 
   });
 
-  test('Регистрация с пустым полем "Name"', async ({ page }) => {
 
-    await registerPage.register('', 'Одинцов', 'uniqueEmail', '1234');
-    await expect(page).toHaveURL('/register');
+  test.describe('T3. Пустые поля', () => {
 
+    const cases: [string, string, string, string, string][] = [
+
+      ['Пустое Name', '', surname, `test_${Date.now()}@mail.ru`, password],
+      ['Пустое Surname', name, '', `test_${Date.now()}@mail.ru`, password],
+      ['Пустой Email', name, surname, '', password],
+      ['Пустой Password', name, surname, `test_${Date.now()}@mail.ru`, ''],
+
+    ];
+
+    for (const [desc, name, surname, email, password] of cases) {
+
+      test(`Ошибка при: ${desc}`, async ({ page }) => {
+
+        const registerPage = new RegisterPage(page);
+        await registerPage.navigate('/register');
+        await registerPage.register(name, surname, email, password);
+        await expect(page).toHaveURL(/register/);
+
+      });
+
+    }
   });
 
-  test('Регистрация с пустым полем "Surname"', async ({ page }) => {
+  test.describe('T4. Невалидные данные', () => {
+    const invalidCases: [string, string, string, string, string][] = [
 
-    const uniqueEmail = `test_${Date.now()}@mail.ru`;
+      ['Имя = цифра', '123', surname, `test_${Date.now()}@mail.ru`, password],
+      ['Имя = спецсимвол', '#', surname, `test_${Date.now()}@mail.ru`, password],
+      ['Фамилия = цифра', name, '123', `test_${Date.now()}@mail.ru`, password],
+      ['Фамилия = спецсимвол', name, '#', `test_${Date.now()}@mail.ru`, password],
+      ['Email без домена', name, surname, `test_${Date.now()}@`, password],
+      ['Email с неполным доменом', name, surname, `test_${Date.now()}@m`, password],
+      ['Пароль = пробел', name, surname, `test_${Date.now()}@mail.ru`, ' '],
 
-    await registerPage.register('Саша', 'Одинцов', 'uniqueEmail', '1234');
-    await expect(page).toHaveURL('/register');
+    ];
 
-  });
+    for (const [desc, name, surname, email, password] of invalidCases) {
 
-  test('Регистрация с пустым полем "Email"', async ({ page }) => {
+      test(`Ошибка при: ${desc}`, async ({ page }) => {
 
-    await registerPage.register('Саша', 'Одинцов', '', '1234');
-    await expect(page).toHaveURL('/register');
+        const registerPage = new RegisterPage(page);
+        await registerPage.navigate('/register');
+        await registerPage.register(name, surname, email, password);
 
-  });
 
-  test('Регистрация с пустым полем "Password"', async ({ page }) => {
+        await expect(page).toHaveURL('/register/');
+        
 
-    const uniqueEmail = `test_${Date.now()}@mail.ru`;
-
-   await registerPage.register('Саша', 'Одинцов', 'uniqueEmail', '');
-   await expect(page).toHaveURL('/register');
-
-  });
-
-  test('Регистрация с невалидным Email', async ({ page }) => {
-
-    const uniqueEmail = `test_${Date.now()}@m`;
-
-    await registerPage.register('Саша', 'Одинцов', uniqueEmail, '1234');
-    await expect(page).toHaveURL('/register');
+      });
+      
+      
+    };
+    
     
   });
 
 });
+
+
+
+
+
+
+
+
+
+
+
+
